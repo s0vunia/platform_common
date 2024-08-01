@@ -2,9 +2,10 @@ package redis
 
 import (
 	"context"
-	"github.com/s0vunia/platform_common/pkg/cache"
 	"log"
 	"time"
+
+	"github.com/s0vunia/platform_common/pkg/cache"
 
 	"github.com/gomodule/redigo/redis"
 )

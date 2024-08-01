@@ -3,9 +3,10 @@ package pg
 import (
 	"context"
 	"fmt"
+	"log"
+
 	"github.com/s0vunia/platform_common/pkg/db"
 	"github.com/s0vunia/platform_common/pkg/db/prettier"
-	"log"
 
 	"github.com/georgysavva/scany/pgxscan"
 	"github.com/jackc/pgconn"
