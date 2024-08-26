@@ -5,6 +5,8 @@ import (
 	"fmt"
 	"log"
 
+	"github.com/opentracing/opentracing-go"
+	"github.com/opentracing/opentracing-go/ext"
 	"github.com/s0vunia/platform_common/pkg/db"
 	"github.com/s0vunia/platform_common/pkg/db/prettier"
 
@@ -39,10 +41,14 @@ func NewDB(dbc *pgxpool.Pool) db.DB {
 }
 
 func (p *pg) ScanOneContext(ctx context.Context, dest interface{}, q db.Query, args ...interface{}) error {
+	span, ctx := opentracing.StartSpanFromContext(ctx, q.Name, opentracing.Tag{Key: "query", Value: q.QueryRaw})
+	defer span.Finish()
 	logQuery(ctx, q, args...)
 
 	row, err := p.QueryContext(ctx, q, args...)
 	if err != nil {
+		ext.Error.Set(span, true)
+		span.SetTag("err", err.Error())
 		return err
 	}
 
@@ -50,10 +56,14 @@ func (p *pg) ScanOneContext(ctx context.Context, dest interface{}, q db.Query, a
 }
 
 func (p *pg) ScanAllContext(ctx context.Context, dest interface{}, q db.Query, args ...interface{}) error {
+	span, ctx := opentracing.StartSpanFromContext(ctx, q.Name, opentracing.Tag{Key: "query", Value: q.QueryRaw})
+	defer span.Finish()
 	logQuery(ctx, q, args...)
 
 	rows, err := p.QueryContext(ctx, q, args...)
 	if err != nil {
+		ext.Error.Set(span, true)
+		span.SetTag("err", err.Error())
 		return err
 	}
 
@@ -61,10 +71,14 @@ func (p *pg) ScanAllContext(ctx context.Context, dest interface{}, q db.Query, a
 }
 
 func (p *pg) ExecContext(ctx context.Context, q db.Query, args ...interface{}) (pgconn.CommandTag, error) {
+	span, ctx := opentracing.StartSpanFromContext(ctx, q.Name, opentracing.Tag{Key: "query", Value: q.QueryRaw})
+	defer span.Finish()
 	logQuery(ctx, q, args...)
 
 	tx, ok := ctx.Value(TxKey).(pgx.Tx)
 	if ok {
+		ext.Error.Set(span, true)
+		span.SetTag("tx", tx)
 		return tx.Exec(ctx, q.QueryRaw, args...)
 	}
 
@@ -72,10 +86,14 @@ func (p *pg) ExecContext(ctx context.Context, q db.Query, args ...interface{}) (
 }
 
 func (p *pg) QueryContext(ctx context.Context, q db.Query, args ...interface{}) (pgx.Rows, error) {
+	span, ctx := opentracing.StartSpanFromContext(ctx, q.Name, opentracing.Tag{Key: "query", Value: q.QueryRaw})
+	defer span.Finish()
 	logQuery(ctx, q, args...)
 
 	tx, ok := ctx.Value(TxKey).(pgx.Tx)
 	if ok {
+		ext.Error.Set(span, true)
+		span.SetTag("tx", tx)
 		return tx.Query(ctx, q.QueryRaw, args...)
 	}
 
@@ -83,10 +101,14 @@ func (p *pg) QueryContext(ctx context.Context, q db.Query, args ...interface{}) 
 }
 
 func (p *pg) QueryRowContext(ctx context.Context, q db.Query, args ...interface{}) pgx.Row {
+	span, ctx := opentracing.StartSpanFromContext(ctx, q.Name, opentracing.Tag{Key: "query", Value: q.QueryRaw})
+	defer span.Finish()
 	logQuery(ctx, q, args...)
 
 	tx, ok := ctx.Value(TxKey).(pgx.Tx)
 	if ok {
+		ext.Error.Set(span, true)
+		span.SetTag("tx", tx)
 		return tx.QueryRow(ctx, q.QueryRaw, args...)
 	}
 
@@ -94,6 +116,8 @@ func (p *pg) QueryRowContext(ctx context.Context, q db.Query, args ...interface{
 }
 
 func (p *pg) BeginTx(ctx context.Context, txOptions pgx.TxOptions) (pgx.Tx, error) {
+	span, ctx := opentracing.StartSpanFromContext(ctx, "BeginTx")
+	defer span.Finish()
 	return p.dbc.BeginTx(ctx, txOptions)
 }
 
