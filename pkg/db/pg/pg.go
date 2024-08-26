@@ -47,8 +47,6 @@ func (p *pg) ScanOneContext(ctx context.Context, dest interface{}, q db.Query, a
 
 	row, err := p.QueryContext(ctx, q, args...)
 	if err != nil {
-		ext.Error.Set(span, true)
-		span.SetTag("err", err.Error())
 		return err
 	}
 
@@ -77,11 +75,11 @@ func (p *pg) ExecContext(ctx context.Context, q db.Query, args ...interface{}) (
 
 	tx, ok := ctx.Value(TxKey).(pgx.Tx)
 	if ok {
-		ext.Error.Set(span, true)
-		span.SetTag("tx", tx)
 		return tx.Exec(ctx, q.QueryRaw, args...)
 	}
 
+	ext.Error.Set(span, true)
+	span.SetTag("tx", tx)
 	return p.dbc.Exec(ctx, q.QueryRaw, args...)
 }
 
@@ -92,11 +90,11 @@ func (p *pg) QueryContext(ctx context.Context, q db.Query, args ...interface{}) 
 
 	tx, ok := ctx.Value(TxKey).(pgx.Tx)
 	if ok {
-		ext.Error.Set(span, true)
-		span.SetTag("tx", tx)
 		return tx.Query(ctx, q.QueryRaw, args...)
 	}
 
+	ext.Error.Set(span, true)
+	span.SetTag("tx", tx)
 	return p.dbc.Query(ctx, q.QueryRaw, args...)
 }
 
@@ -107,11 +105,11 @@ func (p *pg) QueryRowContext(ctx context.Context, q db.Query, args ...interface{
 
 	tx, ok := ctx.Value(TxKey).(pgx.Tx)
 	if ok {
-		ext.Error.Set(span, true)
-		span.SetTag("tx", tx)
 		return tx.QueryRow(ctx, q.QueryRaw, args...)
 	}
 
+	ext.Error.Set(span, true)
+	span.SetTag("tx", tx)
 	return p.dbc.QueryRow(ctx, q.QueryRaw, args...)
 }
 
