@@ -47,10 +47,19 @@ func (p *pg) ScanOneContext(ctx context.Context, dest interface{}, q db.Query, a
 
 	row, err := p.QueryContext(ctx, q, args...)
 	if err != nil {
+		ext.Error.Set(span, true)
+		span.SetTag("err", err.Error())
 		return err
 	}
 
-	return pgxscan.ScanOne(dest, row)
+	err = pgxscan.ScanOne(dest, row)
+	if err != nil {
+		ext.Error.Set(span, true)
+		span.SetTag("err", err.Error())
+		return err
+	}
+
+	return nil
 }
 
 func (p *pg) ScanAllContext(ctx context.Context, dest interface{}, q db.Query, args ...interface{}) error {
@@ -65,7 +74,14 @@ func (p *pg) ScanAllContext(ctx context.Context, dest interface{}, q db.Query, a
 		return err
 	}
 
-	return pgxscan.ScanAll(dest, rows)
+	err = pgxscan.ScanAll(dest, rows)
+	if err != nil {
+		ext.Error.Set(span, true)
+		span.SetTag("err", err.Error())
+		return err
+	}
+
+	return nil
 }
 
 func (p *pg) ExecContext(ctx context.Context, q db.Query, args ...interface{}) (pgconn.CommandTag, error) {
@@ -74,13 +90,21 @@ func (p *pg) ExecContext(ctx context.Context, q db.Query, args ...interface{}) (
 	logQuery(ctx, q, args...)
 
 	tx, ok := ctx.Value(TxKey).(pgx.Tx)
+	var err error
+	var pgc pgconn.CommandTag
 	if ok {
-		return tx.Exec(ctx, q.QueryRaw, args...)
+		pgc, err = tx.Exec(ctx, q.QueryRaw, args...)
+	} else {
+		pgc, err = p.dbc.Exec(ctx, q.QueryRaw, args...)
 	}
 
-	ext.Error.Set(span, true)
-	span.SetTag("tx", tx)
-	return p.dbc.Exec(ctx, q.QueryRaw, args...)
+	if err != nil {
+		ext.Error.Set(span, true)
+		span.SetTag("err", err.Error())
+		return pgc, err
+	}
+
+	return pgc, nil
 }
 
 func (p *pg) QueryContext(ctx context.Context, q db.Query, args ...interface{}) (pgx.Rows, error) {
@@ -89,13 +113,21 @@ func (p *pg) QueryContext(ctx context.Context, q db.Query, args ...interface{}) 
 	logQuery(ctx, q, args...)
 
 	tx, ok := ctx.Value(TxKey).(pgx.Tx)
+	var rows pgx.Rows
+	var err error
 	if ok {
-		return tx.Query(ctx, q.QueryRaw, args...)
+		rows, err = tx.Query(ctx, q.QueryRaw, args...)
+	} else {
+		rows, err = p.dbc.Query(ctx, q.QueryRaw, args...)
 	}
 
-	ext.Error.Set(span, true)
-	span.SetTag("tx", tx)
-	return p.dbc.Query(ctx, q.QueryRaw, args...)
+	if err != nil {
+		ext.Error.Set(span, true)
+		span.SetTag("err", err.Error())
+		return rows, err
+	}
+
+	return rows, nil
 }
 
 func (p *pg) QueryRowContext(ctx context.Context, q db.Query, args ...interface{}) pgx.Row {
@@ -107,9 +139,6 @@ func (p *pg) QueryRowContext(ctx context.Context, q db.Query, args ...interface{
 	if ok {
 		return tx.QueryRow(ctx, q.QueryRaw, args...)
 	}
-
-	ext.Error.Set(span, true)
-	span.SetTag("tx", tx)
 	return p.dbc.QueryRow(ctx, q.QueryRaw, args...)
 }
 
