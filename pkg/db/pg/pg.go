@@ -2,18 +2,14 @@ package pg
 
 import (
 	"context"
-	"fmt"
-	"log"
-
-	"github.com/opentracing/opentracing-go"
-	"github.com/opentracing/opentracing-go/ext"
-	"github.com/s0vunia/platform_common/pkg/db"
-	"github.com/s0vunia/platform_common/pkg/db/prettier"
 
 	"github.com/georgysavva/scany/pgxscan"
 	"github.com/jackc/pgconn"
 	"github.com/jackc/pgx/v4"
 	"github.com/jackc/pgx/v4/pgxpool"
+	"github.com/opentracing/opentracing-go"
+	"github.com/opentracing/opentracing-go/ext"
+	"github.com/s0vunia/platform_common/pkg/db"
 )
 
 type key string
@@ -43,7 +39,6 @@ func NewDB(dbc *pgxpool.Pool) db.DB {
 func (p *pg) ScanOneContext(ctx context.Context, dest interface{}, q db.Query, args ...interface{}) error {
 	span, ctx := opentracing.StartSpanFromContext(ctx, q.Name, opentracing.Tag{Key: "query", Value: q.QueryRaw})
 	defer span.Finish()
-	logQuery(ctx, q, args...)
 
 	row, err := p.QueryContext(ctx, q, args...)
 	if err != nil {
@@ -65,7 +60,6 @@ func (p *pg) ScanOneContext(ctx context.Context, dest interface{}, q db.Query, a
 func (p *pg) ScanAllContext(ctx context.Context, dest interface{}, q db.Query, args ...interface{}) error {
 	span, ctx := opentracing.StartSpanFromContext(ctx, q.Name, opentracing.Tag{Key: "query", Value: q.QueryRaw})
 	defer span.Finish()
-	logQuery(ctx, q, args...)
 
 	rows, err := p.QueryContext(ctx, q, args...)
 	if err != nil {
@@ -87,7 +81,6 @@ func (p *pg) ScanAllContext(ctx context.Context, dest interface{}, q db.Query, a
 func (p *pg) ExecContext(ctx context.Context, q db.Query, args ...interface{}) (pgconn.CommandTag, error) {
 	span, ctx := opentracing.StartSpanFromContext(ctx, q.Name, opentracing.Tag{Key: "query", Value: q.QueryRaw})
 	defer span.Finish()
-	logQuery(ctx, q, args...)
 
 	tx, ok := ctx.Value(TxKey).(pgx.Tx)
 	var err error
@@ -110,7 +103,6 @@ func (p *pg) ExecContext(ctx context.Context, q db.Query, args ...interface{}) (
 func (p *pg) QueryContext(ctx context.Context, q db.Query, args ...interface{}) (pgx.Rows, error) {
 	span, ctx := opentracing.StartSpanFromContext(ctx, q.Name, opentracing.Tag{Key: "query", Value: q.QueryRaw})
 	defer span.Finish()
-	logQuery(ctx, q, args...)
 
 	tx, ok := ctx.Value(TxKey).(pgx.Tx)
 	var rows pgx.Rows
@@ -133,7 +125,6 @@ func (p *pg) QueryContext(ctx context.Context, q db.Query, args ...interface{}) 
 func (p *pg) QueryRowContext(ctx context.Context, q db.Query, args ...interface{}) pgx.Row {
 	span, ctx := opentracing.StartSpanFromContext(ctx, q.Name, opentracing.Tag{Key: "query", Value: q.QueryRaw})
 	defer span.Finish()
-	logQuery(ctx, q, args...)
 
 	tx, ok := ctx.Value(TxKey).(pgx.Tx)
 	if ok {
@@ -166,13 +157,4 @@ func (p *pg) Close() {
 // - context.Context: the new context with the transaction object attached
 func MakeContextTx(ctx context.Context, tx pgx.Tx) context.Context {
 	return context.WithValue(ctx, TxKey, tx)
-}
-
-func logQuery(ctx context.Context, q db.Query, args ...interface{}) {
-	prettyQuery := prettier.Pretty(q.QueryRaw, prettier.PlaceholderDollar, args...)
-	log.Println(
-		ctx,
-		fmt.Sprintf("sql: %s", q.Name),
-		fmt.Sprintf("query: %s", prettyQuery),
-	)
 }
